@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="es-ES"><head><meta charset="iso-8859-1"><title>Catálogos Bibliotecas - Comunidad de Madrid</title></head>
+<body>
+<p id="varJSONmain" class="dn" aria-hidden="true">
+<span id="cgi">/biblio_publicas/cgi-bin/abnetopac/THREADTOKEN00/NT3</span>
+</p>
+
+<form id="subform" action="/biblio_publicas/cgi-bin/abnetopac/THREADTOKEN00/NT3" method="post">
+  <input type="hidden" name="ACC" value="101">
+  <input type="hidden" name="xindbt" value="">
+</form>
+
+<form id="abnformSearch" action="/biblio_publicas/cgi-bin/abnetopac/THREADTOKEN00/NT11" method="post">
+  <input type="hidden" name="ACC" value="131">
+  <input type="hidden" name="START" value="1">
+  <input type="hidden" name="FORM" value="1">
+  <input type="hidden" name="xindbt" value="">
+  <input type="hidden" name="xmismo" value="on">
+  <input type="hidden" name="FORM_DIGITAL" value="9">
+  <input type="hidden" name="xsface" value="on">
+  <select id="subcat" name="subcat"><option selected="selected" value="/">Todas las bibliotecas</option></select>
+  <input type="text" id="xsqf01" name="xsqf01" value="">
+</form>
+
+<form id="abnopid" action="/biblio_publicas/cgi-bin/abnetopac/THREADTOKEN00/NT1" method="post">
+  <input type="hidden" name="FBC" value="316">
+  <input type="hidden" name="NAC" value="317">
+  <input type="hidden" name="ACC" value="201">
+  <input type="text" id="leid" name="leid" aria-required="true">
+  <input type="password" id="lepass" name="lepass">
+  <input type="submit" value="Conectar">
+</form>
+</body></html>

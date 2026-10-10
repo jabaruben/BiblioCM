@@ -1,0 +1,27 @@
+.playwright-mcp/
+local.properties
+*.keystore
+*.jks
+secrets.properties
+captures/
+.biblio-data/
+.biblio-test-*/
+__pycache__/
+*.egg-info/
+build/
+dist/
+# Material privado que nunca debe versionarse (ver SECURITY.md y release_scan).
+.biblio-certs/
+*.pem
+*.key
+*.pfx
+*.p12
+.env
+.env.*
+id_rsa
+id_ed25519
+credentials.json
+*.sqlite3
+# Handoff legado local con datos personales y contrato obsoleto: se conserva
+# intacto en el trabajo local y queda fuera del set publicable.
+docs/HANDOFF-SOL.md

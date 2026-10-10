@@ -1,0 +1,32 @@
+[project]
+name = "biblio-cm"
+version = "0.1.0"
+description = "Gestión de préstamos de las Bibliotecas de la Comunidad de Madrid"
+# Metadatos de publicación: el texto de la licencia vive en LICENSE (MIT,
+# titular «jabaruben/BiblioCM») y el readme público en README.md.
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.11"
+# Excepción de dependencias acotada (ADR-015 / ADR-018): `webauthn` verifica el
+# registro/autenticación WebAuthn y `joserfc` el token ID OIDC (firma + claims).
+# Sin ellas habría que escribir criptografía a medida; el resto del proyecto
+# sigue solo con la stdlib y `cryptography`.
+dependencies = [
+    "cryptography>=44",
+    "webauthn>=2.2.0",
+    "joserfc>=1.6",
+]
+
+[project.scripts]
+biblio = "biblio.cli:main"
+biblio-web = "biblio.web:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["biblio"]
+
+[tool.setuptools.package-data]
+biblio = ["static/*"]

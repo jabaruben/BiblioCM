@@ -1,0 +1,40 @@
+# CI de solo lectura (TODO-CI-001 / ADR-016): comprueba documentación, suite
+# unittest, sintaxis de los assets JS y el escaneo de publicación. No publica,
+# no despliega y no usa secretos: el permiso se limita a leer el repositorio.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Instalar el paquete
+        run: python -m pip install -e .
+      - name: Validar documentación y backlog
+        run: python scripts/check_docs.py --tests
+      - name: Suite unittest (sin portal ni credenciales reales)
+        run: python -m unittest discover -s tests -t .
+      - name: Sintaxis de los assets del shell
+        run: |
+          node --check biblio/static/app.js
+          node --check biblio/static/sw.js
+      - name: Escaneo de publicación
+        run: python scripts/release_scan.py
