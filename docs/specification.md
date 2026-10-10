@@ -100,6 +100,13 @@ Criterios de aceptación:
   librería; el servidor no confía en datos del navegador sin verificarlos.
 - Borrar una passkey o añadir una primera exige reautenticación explícita
   (contraseña o passkey vigente), no solo la sesión abierta.
+- La ventana de reautenticación se mide con `time.monotonic()` contra la marca
+  de la sesión: solo una contraseña verificada o un login con passkey dentro de
+  esa ventana habilita a gestionar. Una sesión **sin marca** (nunca
+  reautenticó) está fuera de la ventana **con cualquier valor del reloj**,
+  también en un host recién arrancado cuyo monotónico aún no llega a `REAUTH_TTL`
+  (300 s); igual cuando la marca existe y está caducada. Ambos casos responden
+  `403` con `code:"reauth_required"` (corrección TODO-SEC-005).
 - Passkeys solo en contexto seguro: sobre HTTP no local la UI las muestra
   deshabilitadas con aviso ([NFR-SVC-003](#nfr-svc-003)); el servidor también
   rechaza operaciones WebAuthn en origen no confiable. Además, el RP ID y el

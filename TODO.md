@@ -56,6 +56,7 @@ Requisitos: [especificación](docs/specification.md). Funcionalidades existentes
 | TODO-SEC-002 | done | P1 | Escaneo de secretos previo a publicar |
 | TODO-SEC-003 | done | P1 | Orígenes de confianza para passkeys y Google |
 | TODO-SEC-004 | done | P1 | Vínculo del flujo Google al navegador y a la sesión |
+| TODO-SEC-005 | done | P1 | Rechazo de reautenticación sin marca con reloj monotónico joven |
 | TODO-NOTIFY-001 | proposed | P3 | Recordatorios/notificaciones |
 | TODO-CAT-003 | proposed | P3 | Metadatos MARC que la UI no muestra |
 | TODO-CAT-004 | proposed | P3 | Facetas y disponibilidad por resultado |
@@ -1651,6 +1652,78 @@ Límites de la corrección: la indivisibilidad cubre el logout de esta instancia
 (las sesiones viven en RAM del proceso); no convierte el vínculo en transacción
 con la sesión de otro proceso porque no hay despliegue distribuido. El orden
 «logout durante el gate → se ordena detrás» es deliberado y está documentado.
+
+### TODO-SEC-005 — Rechazo de reautenticación sin marca con reloj monotónico joven
+
+**Estado:** `done`
+**Prioridad:** P1
+**Tipo:** seguridad
+**Responsable:** ORCA-implementer MiMo
+**Actualizado:** 2026-10-10
+**Requisitos:** [FR-AUTH-004](docs/specification.md#fr-auth-004),
+[FR-AUTH-005](docs/specification.md#fr-auth-005),
+[NFR-SEC-002](docs/specification.md#nfr-sec-002).
+
+Origen: evidencia externa de CI sobre el commit `969e247` (Ubuntu Python 3.11):
+`tests.test_passkeys.PasskeyFlowTests.test_management_requires_fresh_reauthentication`
+falló en la línea 179 con `403 != 200`, mientras Windows 3.11/3.13 y Ubuntu 3.13
+pasaron (3 pasan / 1 falla; el siguiente push quedó por verificar). Causa
+identificada por inspección y reproducida en local: `require_reauth` usa
+`session.get("reauth_at", 0)`, de modo que una sesión que **nunca** reautenticó
+se compara contra el instante `0` del reloj monotónico. En un host cuyo
+`time.monotonic()` aún no llega a `REAUTH_TTL` (300 s: VM/contenedor recién
+arrancado, típico en CI) `monotonic - 0 <= 300` y el servidor respondía **200**
+en lugar de `403` para `auth/passkeys/register/options`; el mismo helper gatea
+`auth/passkeys/register`/`delete` y `auth/google/start` (modo `link`) y
+`auth/google/unlink`, así que la ventana de reautenticación dependía de la
+antigüedad del host.
+Aceptación: (1) una sesión sin `reauth_at` o con la marca caducada recibe
+siempre `403` `code:"reauth_required"`, con cualquier valor de
+`time.monotonic()`; (2) una reautenticación fresca sigue abriendo la ventana
+con el mismo reloj joven; (3) sin tocar la caducidad deslizante de sesión
+(`TTL`), la ventana `REAUTH_TTL` ni la selección de sesión por token; (4) la
+prueba de CI y cualquier aserción previa se conservan: sin debilitar, eliminar
+ni saltar.
+RED previsto: ver Evidencia.
+Verificación al cerrar: `python -m unittest tests.test_passkeys` (repetido),
+`python -m unittest discover -s tests -t .`, `python scripts/check_docs.py
+--tests` y `node --check` de app.js y sw.js.
+Dependencias: ninguna; sin dependencias nuevas, sin tocar store, BD ni portal.
+
+Evidencia: 2026-10-10. **Adjudicación: defecto de producto (seguridad), no de
+la prueba.** La prueba de CI pide el `403` que exige el invariante y el fallo
+solo aparece cuando `time.monotonic() < REAUTH_TTL`; no se tocó, debilitó ni
+saltó ninguna aserción. Fail-before reproducible en local sin esperar la
+uptime de la máquina: `python -m unittest
+tests.test_passkeys.PasskeyFlowTests.test_management_without_reauth_is_rejected_on_a_young_monotonic_clock`
+→ **FAIL (exit 1)**, `AssertionError: 200 != 403` en `assertEqual(code, 403)`
+antes de la corrección (la prueba fija el reloj de `biblio.web` a
+`REAUTH_TTL - 1`; una reproducción independiente con `time.monotonic()` = 42 s
+devolvió también `200` en `auth/passkeys/register/options`), y **OK** después.
+Evidencia externa de CI sobre `969e247`: Ubuntu 3.11 falló en la línea 179
+(`403 != 200`) y Windows 3.11/3.13 y Ubuntu 3.13 pasaron (**3 pasan / 1
+falla**; aquí la suite local pasaba porque el monotónico del equipo supera
+`REAUTH_TTL`); el siguiente push quedó por verificar.
+GREEN (2026-10-10): [biblio/web.py](biblio/web.py) — `require_reauth` toma
+`session.get("reauth_at")` y exige que la marca exista y sea numérica antes de
+compararla con `time.monotonic() - REAUTH_TTL`; sin marca (o no numérica) →
+`403` `code:"reauth_required"` con cualquier valor del reloj. Sin cambio de
+contrato (el `403`/`reauth_required` ya estaba documentado en
+[api.md](docs/api.md)), sin tocar store, BD, portal ni UI, y sin dependencias
+nuevas.
+Pruebas: 1 nueva en [tests/test_passkeys.py](tests/test_passkeys.py)
+(`test_management_without_reauth_is_rejected_on_a_young_monotonic_clock`, que
+además exige que el rechazo no emita reto de registro y que una reautenticación
+fresca sí habilita con el mismo reloj joven); recuento 343 → **344**.
+Comprobaciones de cierre: `python -m unittest tests.test_passkeys` → **32 OK**
+en tres ejecuciones seguidas; cinco pruebas de reautenticación (la de CI, la
+nueva, caducidad, borrado y login con passkey) → **OK** en cinco
+ejecuciones seguidas; `python -m unittest tests.test_oidc` → **50 OK** (mismo
+helper para el vínculo de Google); `python -m unittest discover -s tests -t .`
+→ **344 OK** (167,3 s); `python scripts/check_docs.py --tests` → **Docs OK** (16
+documentos, 23 requisitos, 43 tareas, 472 enlaces, 344 tests); `node --check`
+de `app.js` y `sw.js` → **0**. Límites: la CI externa no se re-ejecutó desde
+aquí; sin navegador (la UI no cambia) ni portal real.
 
 ### TODO-PUB-002 — Candidato público limpio, allowlist del escaneo y auditoría aislada
 

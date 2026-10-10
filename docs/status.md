@@ -4,7 +4,7 @@
 `bibliocm-shell-v13`. Estas versiones son distintas: actualizar una no actualiza
 automáticamente las otras. La API pasó de `4` a `5` al añadir los endpoints de
 identidad —email verificado, cambio y recuperación de contraseña
-([FR-AUTH-002](specification.md#fr-auth-002), 
+([FR-AUTH-002](specification.md#fr-auth-002),
 [FR-AUTH-003](specification.md#fr-auth-003), [ADR-017](decisions.md))— y
 `email`/`email_verified` en el usuario de `/api/session` y `/api/settings`; la
 forma de todo lo anterior no cambia. Pasó de `5` a `6` al añadir las passkeys
@@ -42,7 +42,7 @@ reconstruye un historial RED/GREEN de todo el código anterior.
 | [FR-AUTH-001](specification.md#fr-auth-001) | Implementado: store/web/formularios | WebTests: registro, validación, login, rotación, logout, TTL; navegador | Recuperación/cambio y email ya no viven aquí: son [FR-AUTH-003](specification.md#fr-auth-003) y [FR-AUTH-002](specification.md#fr-auth-002), implementados |
 | [FR-AUTH-002](specification.md#fr-auth-002) | Implementado: email verificado con username como alias (store/web/UI) | WebTests de identidad ([test_identity.py](../tests/test_identity.py)): código por correo falso, hash en BD (nunca el claro), un solo uso, caducidad, anti-enumeración, email ocupado silencioso, fallo de entrega con respuesta uniforme (revisión), SMTP caído sin token vivo, rate limit por ruta, login con email verificado y rechazo del sin verificar, alias username intacto; navegador: verificar desde Configuración, login con email y rechazo del sin verificar | SMTP real no probado (solo el falso local); sin notificaciones de cuenta ajena; el pendiente no se persiste: tras recargar se pide otro código |
 | [FR-AUTH-003](specification.md#fr-auth-003) | Implementado: cambio y recuperación de contraseña (store/web/UI) | WebTests de identidad: cambio con contraseña actual **atómico bajo el lock del store** (revisión: dos cambios concurrentes no pueden verificar ambos contra la contraseña vieja; cambio+reset dejan una sola contraseña coherente), cierre de las demás sesiones conservando la actual, preservación de clave Fernet/carnés/vínculos, recuperación con código de un solo uso y caducidad, cierre de todas las sesiones al usarlo, respuestas sin enumeración **incluido el fallo de correo**, rate limit propio; navegador: cambio con sesión viva y recuperación con el correo falso | Portal OPAC no involucrado (invariante intacto); sin 2FA; recovery requiere email verificado previo |
-| [FR-AUTH-004](specification.md#fr-auth-004) | Implementado: passkeys con `webauthn` (store/web/UI) | [test_passkeys.py](../tests/test_passkeys.py) con autenticador sintético: registro/login verificados por la librería, reautenticación para añadir/borrar con caducidad, challenge de un solo uso y caducado, origen ajeno, payload malformado, reto de otro usuario, firma/UV/contador, no enumeración y login concurrente; rechazo de Host hostil sobre TLS, origen HTTPS listado exactamente y flujo completo sobre origen configurado (TODO-SEC-003); migración v2 con rollback; navegador con autenticador virtual de Chromium en escritorio y móvil (alta, borrado y login) | Sin hardware real ni Safari/Firefox; Chromium rechaza RP ID con IP literal (la UI lo explica); el portal OPAC no interviene |
+| [FR-AUTH-004](specification.md#fr-auth-004) | Implementado: passkeys con `webauthn` (store/web/UI) | [test_passkeys.py](../tests/test_passkeys.py) con autenticador sintético: registro/login verificados por la librería, reautenticación para añadir/borrar con caducidad (incluida la sesión **sin marca** con `time.monotonic()` joven, [TODO-SEC-005](../TODO.md)), challenge de un solo uso y caducado, origen ajeno, payload malformado, reto de otro usuario, firma/UV/contador, no enumeración y login concurrente; rechazo de Host hostil sobre TLS, origen HTTPS listado exactamente y flujo completo sobre origen configurado (TODO-SEC-003); migración v2 con rollback; navegador con autenticador virtual de Chromium en escritorio y móvil (alta, borrado y login) | Sin hardware real ni Safari/Firefox; Chromium rechaza RP ID con IP literal (la UI lo explica); el portal OPAC no interviene |
 | [FR-AUTH-005](specification.md#fr-auth-005) | Implementado: Google OIDC opcional con `joserfc` (store/web/UI), con el flujo **atado al navegador y a su sesión viva** (TODO-SEC-004) | [test_oidc.py](../tests/test_oidc.py) con proveedor OIDC falso local (descubrimiento + JWKS + token RS256): opt-in, `state`/nonce/PKCE de un solo uso y caducados, verificación de firma/issuer/audiencia/expiración/nonce, identidad por `sub`, sin merge por email, alta explícita con alias determinista, vinculación/desvinculación con reautenticación y email verificado, unicidad y rate limit; callback derivado solo de origen de confianza (Host hostil → 403, configuración inválida → 503, TODO-SEC-003); **login CSRF en dos contextos de navegador**: cookie de enlace `biblio_oidc` (HttpOnly, Lax, ruta del flujo, TTL del `state`, Secure con `--secure`) con solo su digest en el estado, comparación en tiempo constante antes del canje del code, rechazo sin llamada al proveedor y sin consumir el estado ante cookie ausente/ajena/transferida/reutilizada/caducada, retiro de la cookie en completar y errores, `link` rechazado con logout pendiente, sesión rotada o email desverificado, y **gate final atómico respecto al logout** (comprobación y escritura serializadas con el lock del logout, con el titular revalidado en la transacción que escribe; regresión determinista con el logout forzado dentro de la ventana); navegador contra el mismo proveedor falso | Google real y credenciales OAuth de la persona no probadas (trámite humano en la consola de Google Cloud, sin APIs de pago; sin promesa de coste, ver fuentes fechadas en [operations.md](operations.md)); sin dispositivos; dos pestañas iniciando flujos a la vez conservan el enlace del último `start` |
 | [FR-ACC-001](specification.md#fr-acc-001) | Implementado: Store + settings UI | WebTests: verificar antes de guardar, cifrado, dueño, editar/borrar, carné único; navegador; desvinculación y rotación esperando a las operaciones en curso de la cuenta | Sin importar registro CLI ni transferir titularidad de un carné |
 | [FR-LINK-001](specification.md#fr-link-001) | Implementado: links SQL + settings | WebTests: solicitud, auto/duplicada, aprobación solo owner, read/manage, no transitividad; navegador | Concesión por titular completo, no por carné individual |
@@ -56,7 +56,7 @@ reconstruye un historial RED/GREEN de todo el código anterior.
 | [FR-PWA-001](specification.md#fr-pwa-001) | Parcial: responsive, manifest, iconos y shell SW | Assets/manifest/whitelist en WebTests; Edge escritorio/móvil emulado, portadas same-origin fuera del alcance del SW | Instalación Android/iPhone, offline completo y accesibilidad: TODO-PLAT-001 / TODO-A11Y-001 |
 | [FR-CLI-001](specification.md#fr-cli-001) | Parcial: comandos y registro | Código, ayuda ejecutable; motor compartido con suites | Sin suite CLI; mensajes/inputs: TODO-CLI-001 |
 | [NFR-SEC-001](specification.md#nfr-sec-001) | Parcial: auth/cifrado/permisos implementados; URLs de catálogo saneadas y descubrimiento de portada tras autorizar | WebTests de CSRF/origin, cookies, read denegado, aislación, cifrado, portadas sin token y descubrimiento denegado sin cliente; navegador sin tokens en el DOM | Queda verificar el portal real en TODO-SEC-001; no auditoría externa |
-| [NFR-SEC-002](specification.md#nfr-sec-002) | Parcial: higiene de tokens de email/recovery, passkeys y OIDC | WebTests de identidad: tokens hasheados (SHA-256), un solo uso, caducidad, rate limit por IP y ruta sin diluir el de login/registro, CSRF+Origin en mutaciones, cierre de sesiones al rotar credenciales, migración con rollback atómico sobre fixtures temporales; test_passkeys/test_oidc: retos hasheados de un solo uso con caducidad, detalle OIDC cifrado con Fernet (nonce/PKCE/enlace/sesión en claro nunca en BD), reautenticación explícita para passkeys y vínculos, rate limit propio, y el enlace de navegador del flujo Google comparado en tiempo constante antes de canjear el code (TODO-SEC-004) | Sin auditoría externa; la verificación de tokens depende de librerías mantenidas, no de código propio |
+| [NFR-SEC-002](specification.md#nfr-sec-002) | Parcial: higiene de tokens de email/recovery, passkeys y OIDC | WebTests de identidad: tokens hasheados (SHA-256), un solo uso, caducidad, rate limit por IP y ruta sin diluir el de login/registro, CSRF+Origin en mutaciones, cierre de sesiones al rotar credenciales, migración con rollback atómico sobre fixtures temporales; test_passkeys/test_oidc: retos hasheados de un solo uso con caducidad, detalle OIDC cifrado con Fernet (nonce/PKCE/enlace/sesión en claro nunca en BD), reautenticación explícita para passkeys y vínculos, y rechazo de la gestión sin reautenticar con un reloj monotónico joven (sesión sin marca, [TODO-SEC-005](../TODO.md)), rate limit propio, y el enlace de navegador del flujo Google comparado en tiempo constante antes de canjear el code (TODO-SEC-004) | Sin auditoría externa; la verificación de tokens depende de librerías mantenidas, no de código propio |
 | [NFR-DATA-001](specification.md#nfr-data-001) | Parcial: baseline SQLite/clave y esquema versionado (`user_version`=2) con migración de identidad v0→v1→v2 | WebTests de reapertura; KeyTests de clave perdida/incompatible/entorno; tests de identidad: migraciones sobre fixtures temporales (v0→v2, v1→v2, reciente y rollback de cada paso) preservando IDs, vínculos, carnés y crypto | Marco completo de migraciones (más allá de identidad), rotación de clave y respaldo/restauración automatizados: TODO-DATA-001 |
 | [NFR-SVC-001](specification.md#nfr-svc-001) | Implementado: versión y puerto exclusivo | WebTests de versión/errores/segundo bind; navegador antiguo rechazado; comprobación local API v6 | No hay despliegue HTTPS probado ni escalado distribuido |
 | [NFR-SVC-002](specification.md#nfr-svc-002) | Implementado: escrituras protegidas, puerta de usuario y puerta de cuenta (ADR-013) | WebTests con `wfile` falso (fallo de imagen/cabecera, errores reales con cliente conectado), RST real sobre HTTP local, portada/renovación sin bloquear otra ruta, otra cuenta ni a otro usuario, y espera de revocación/bajada/desvinculación/rotación verificada por mutación (4 tests con Event) | Sin carga ni portal real; una operación ya autorizada puede terminar tras un logout (una petición posterior da 401); las puertas viven en RAM |
@@ -74,7 +74,9 @@ deducir cobertura adicional solo del nombre de un fichero.
 
 ## Baseline de pruebas
 
-Suite estándar: **343 tests**, sin acceso al portal ni credenciales reales.
+Suite estándar: **344 tests**, sin acceso al portal ni credenciales reales
+(343 hasta 2026-10-10; el 344.º añade la regresión de
+[TODO-SEC-005](../TODO.md)).
 
 | Suite | Tests descubiertos en esta base |
 |---|---:|
@@ -87,9 +89,9 @@ Suite estándar: **343 tests**, sin acceso al portal ni credenciales reales.
 | `tests.test_release_scan` | 31 |
 | `tests.test_release_export` | 4 |
 | `tests.test_identity` | 33 |
-| `tests.test_passkeys` | 31 |
+| `tests.test_passkeys` | 32 |
 | `tests.test_oidc` | 50 |
-| Total | 343 |
+| Total | 344 |
 
 Comando observado en la sesión de implementación del 2026-10-08 y repetido el
 2026-10-09 tras TODO-SVC-002, finalizado correctamente en ambos casos:
@@ -168,6 +170,42 @@ mismo lock que usa el logout, más revalidación del titular dentro de la
 transacción de escritura) y regresión determinista que fuerza el logout dentro
 de esa ventana y demuestra que el lock aparece contendido (RED reproducible
 quitando el lock: el logout se colaba). Recuento de pruebas 329 → 331.
+
+## Rechazo de reautenticación sin marca con reloj monotónico joven (2026-10-10)
+
+[TODO-SEC-005](../TODO.md) (**`done`**, P1). Evidencia externa de CI sobre el
+commit `969e247`: la prueba
+`tests.test_passkeys.PasskeyFlowTests.test_management_requires_fresh_reauthentication`
+(línea 179) falló en Ubuntu Python 3.11 con `403 != 200`, mientras Windows 3.11/3.13 y Ubuntu 3.13 pasaron
+(**3 pasan / 1 falla**; el siguiente push quedó por verificar). Causa:
+`require_reauth` comparaba `session.get("reauth_at", 0)`, así que una sesión
+que **nunca** reautenticó se medía contra el instante `0` del reloj monotónico;
+en un host con `time.monotonic() < REAUTH_TTL` (300 s: VM/contenedor recién
+arrancado, habitual en CI) esa sesión entraba en la ventana falsa y el
+servidor respondía **200** en lugar de `403` para `auth/passkeys/register/options`
+(el mismo helper gatea también `register`/`delete` de passkeys y el
+vínculo/desvinculación de Google). Defecto de producto, no de la prueba: la
+prueba de CI era correcta y se conserva intacta.
+
+RED/GREEN 2026-10-10: `python -m unittest
+tests.test_passkeys.PasskeyFlowTests.test_management_without_reauth_is_rejected_on_a_young_monotonic_clock`
+→ **`AssertionError: 200 != 403` (exit 1)** antes de la corrección, con el
+`time.monotonic()` de `biblio.web` fijado a `REAUTH_TTL - 1` en la prueba
+(reloj del host reproducido sin dormir ni tocar el sistema); con
+`require_reauth` rechazando cualquier sesión sin `reauth_at` o con marca no
+numérica → **OK**. Recuento de pruebas 343 → **344**.
+
+Comprobaciones de cierre 2026-10-10: `python -m unittest tests.test_passkeys`
+→ **32 OK** en tres ejecuciones seguidas (20,3 s / 20,8 s / 21,5 s); las cinco
+pruebas de reautenticación (la de CI, la nueva, caducidad, borrado y login con
+passkey) → **OK** en cinco ejecuciones seguidas; `python -m unittest
+tests.test_oidc` → **50 OK** (el helper es el mismo que gatea el vínculo de
+Google); `python -m unittest discover -s tests -t .` → **344 OK** (167,3 s);
+`python scripts/check_docs.py --tests` → **Docs OK** (16 documentos, 23
+requisitos, **43 tareas**, 472 enlaces, 344 tests); `node --check` de `app.js`
+y `sw.js` → **0**. Límites: la CI externa no se re-ejecutó desde aquí (el
+siguiente push queda por verificar), no se usó navegador ni portal (la UI no
+cambia) y no hay dependencias nuevas.
 
 ## Gate de privacidad del candidato público (2026-10-10)
 

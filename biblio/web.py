@@ -609,10 +609,14 @@ class Handler(BaseHTTPRequestHandler):
         Solo la ventana `REAUTH_TTL` tras una contraseña verificada o una
         passkey usada cuenta como reautenticación; fuera de ella la respuesta
         lleva `code: reauth_required` para que la UI pida el dato (los mensajes
-        siguen sin ser claves de lógica de cliente).
+        siguen sin ser claves de lógica de cliente). Una sesión **sin** marca
+        `reauth_at` nunca reautenticó y queda fuera de la ventana con cualquier
+        valor del reloj: tratar su ausencia como `0` hacía que un host cuyo
+        `time.monotonic()` aún no llegara a `REAUTH_TTL` (equipo/VM recién
+        arrancado) aceptara la gestión sin reautenticar (TODO-SEC-005).
         """
-        stamp = session.get("reauth_at", 0) if isinstance(session, dict) else 0
-        if time.monotonic() - stamp > REAUTH_TTL:
+        stamp = session.get("reauth_at") if isinstance(session, dict) else None
+        if not isinstance(stamp, (int, float)) or time.monotonic() - stamp > REAUTH_TTL:
             raise AppError(403, "Confirma tu contraseña para gestionar passkeys o identidades externas.",
                            code="reauth_required")
 

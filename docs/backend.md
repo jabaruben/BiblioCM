@@ -256,7 +256,11 @@ Sesiones en RAM: token aleatorio, user_id, CSRF, expires, lock y (desde la API
 `6`) `reauth_at`, la marca de la última reautenticación explícita: la abren
 `auth/reauth` (contraseña verificada) y el login con passkey, y es lo que
 exigen añadir/borrar passkeys y vincular/desvincular Google durante 300 s
-(`REAUTH_TTL`). TTL deslizante 3600 s; hasta 100 sesiones según el control de
+(`REAUTH_TTL`). **Sin esa clave no hay reautenticación**: `require_reauth`
+rechaza la sesión con `403`/`reauth_required` con cualquier valor del reloj
+monotónico, en lugar de comparar contra `0`, que haría válida una sesión sin
+marca en un host recién arrancado cuyo `time.monotonic()` no llega aún a
+`REAUTH_TTL` (TODO-SEC-005). TTL deslizante 3600 s; hasta 100 sesiones según el control de
 alta. Registrar usuario y reservar
 capacidad de sesión no son una transacción única: esta arista tiene trabajo pendiente
 en TODO-TEST-001, con un caso de capacidad y estado persistido.

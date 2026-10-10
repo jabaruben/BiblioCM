@@ -14,6 +14,7 @@ import tempfile
 import threading
 import time
 import unittest
+import unittest.mock
 from pathlib import Path
 
 from cryptography.fernet import Fernet
@@ -182,6 +183,31 @@ class PasskeyFlowTests(PasskeyTestCase):
         self.reauth(status=403, password="contraseña-mala-000")
         self.reauth()
         self.registration_options()
+
+    def test_management_without_reauth_is_rejected_on_a_young_monotonic_clock(self):
+        # TODO-SEC-005: `reauth_at` ausente valía 0, así que con un
+        # `time.monotonic()` más joven que `REAUTH_TTL` (host/VM recién
+        # arrancado: el caso que falló en CI) una sesión que nunca reautenticó
+        # entraba en la ventana falsa y recibía 200 en vez de 403.
+        class YoungClock:
+            def monotonic(self):
+                return REAUTH_TTL - 1
+
+            def __getattr__(self, name):
+                return getattr(time, name)
+
+        with unittest.mock.patch("biblio.web.time", YoungClock()):
+            code, _, raw = self.request("/api/auth/passkeys/register/options", {})
+            self.assertEqual(code, 403, raw.decode())
+            self.assertEqual(json.loads(raw)["code"], "reauth_required")
+            # El rechazo ocurre antes de emitir ningún reto de registro.
+            registered = self.sql("SELECT COUNT(*) FROM auth_challenges "
+                                  "WHERE purpose='webauthn_register'")[0][0]
+            self.assertEqual(registered, 0)
+            # Con el mismo reloj joven, una reautenticación fresca sí
+            # habilita a gestionar: la ventana no se cierra por arriba.
+            self.reauth()
+            self.registration_options()
 
     def test_delete_requires_reauth_and_only_touches_own_passkeys(self):
         authenticator = self.authenticator()
